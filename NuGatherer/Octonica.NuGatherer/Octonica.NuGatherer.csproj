@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  
+  <PropertyGroup>
+    <TargetFramework>net40</TargetFramework>
+    <Description>NuGatherer MSBuild task</Description>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <Reference Include="Microsoft.Build" />
+    <Reference Include="Microsoft.Build.Framework" />
+    <Reference Include="Microsoft.Build.Utilities.v4.0" />
+  </ItemGroup>
+  
+  <Import Project="..\NuGatherer.Assembly.proj" />
+  
+</Project>

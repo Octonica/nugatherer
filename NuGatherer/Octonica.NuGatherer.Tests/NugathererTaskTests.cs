@@ -92,7 +92,7 @@ namespace Octonica.NuGatherer.Tests
 
         private static TaskItem GetTaskItem(string projectFolder)
         {
-            var path = Path.Combine("../../TestData", projectFolder, "proj.csproj");
+            var path = Path.Combine("../../../TestData", projectFolder, "proj.csproj");
             var taskItem = new TaskItem(path);
             return taskItem;
         }
