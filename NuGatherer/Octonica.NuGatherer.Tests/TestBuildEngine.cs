@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using Microsoft.Build.Framework;
 using NUnit.Framework;
 
@@ -24,7 +25,7 @@ namespace Octonica.NuGatherer.Tests
 
         public TestBuildEngine()
         {
-            var assembly = typeof(TestBuildEngine).Assembly;
+            var assembly = typeof(TestBuildEngine).GetTypeInfo().Assembly;
             var path = assembly.Location;
             var dir = Path.GetDirectoryName(path);
             Assert.That(dir, Is.Not.Null);

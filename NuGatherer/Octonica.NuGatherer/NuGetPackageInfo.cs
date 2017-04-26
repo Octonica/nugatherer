@@ -19,7 +19,7 @@ namespace Octonica.NuGatherer
 
         public NuGetPackageInfo(string sourceFile, XElement element)
         {
-            _allProperties = new Dictionary<string, Pair>(StringComparer.InvariantCulture);
+            _allProperties = new Dictionary<string, Pair>(StringComparer.OrdinalIgnoreCase);
             foreach (var attribute in element.Attributes())
                 _allProperties.Add(attribute.Name.LocalName, new Pair(attribute.Value, sourceFile));
         }
@@ -36,7 +36,7 @@ namespace Octonica.NuGatherer
                     continue;
                 }
 
-                if (StringComparer.InvariantCultureIgnoreCase.Equals(value.Value, pair.Value.Value))
+                if (StringComparer.OrdinalIgnoreCase.Equals(value.Value, pair.Value.Value))
                     continue;
 
                 if (diffs == null)

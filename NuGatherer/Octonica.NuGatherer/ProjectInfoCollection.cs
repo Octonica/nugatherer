@@ -10,8 +10,8 @@ namespace Octonica.NuGatherer
     {
         private readonly ProjectCollection _projectCollection;
 
-        private readonly Dictionary<string, ProjectInfo> _projects = new Dictionary<string, ProjectInfo>(StringComparer.InvariantCultureIgnoreCase);
-        private readonly Dictionary<string, Project> _loadedProject = new Dictionary<string, Project>(StringComparer.InvariantCultureIgnoreCase);
+        private readonly Dictionary<string, ProjectInfo> _projects = new Dictionary<string, ProjectInfo>(PathHelper.Comparer);
+        private readonly Dictionary<string, Project> _loadedProject = new Dictionary<string, Project>(PathHelper.Comparer);
 
         public ProjectInfoCollection(Dictionary<string, string> properties)
         {
@@ -61,7 +61,7 @@ namespace Octonica.NuGatherer
             bool isValid = true;
             foreach (var pair in rootMap)
             {
-                var uniquePackages = new Dictionary<string, NuGetPackageInfo>(StringComparer.InvariantCultureIgnoreCase);
+                var uniquePackages = new Dictionary<string, NuGetPackageInfo>(PathHelper.Comparer);
                 foreach (var project in pair.Value)
                 {
                     List<NuGetPackageInfo> packages;

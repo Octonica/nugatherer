@@ -41,7 +41,7 @@ namespace Octonica.NuGatherer
                     projectPaths.Enqueue(filePath);
                 }
 
-                var nugetPackages = new Dictionary<string, List<NuGetPackageInfo>>(StringComparer.InvariantCultureIgnoreCase);
+                var nugetPackages = new Dictionary<string, List<NuGetPackageInfo>>(StringComparer.OrdinalIgnoreCase);
                 while (projectPaths.Count > 0)
                 {
                     var projectInfo = collection.LoadProjectInfo(projectPaths.Dequeue());
@@ -83,7 +83,7 @@ namespace Octonica.NuGatherer
 
         private Dictionary<string, string> PrepareProperties(string baseDirectory)
         {
-            var result = new Dictionary<string, string>(StringComparer.InvariantCulture);
+            var result = new Dictionary<string, string>(StringComparer.Ordinal);
 
             if (string.IsNullOrWhiteSpace(PropertiesFile))
                 return result;
@@ -188,9 +188,8 @@ namespace Octonica.NuGatherer
             var doc = new XDocument(new XDeclaration("1.0", "utf-8", "yes"), root);
 
             using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write))
-            using (var writer = new XmlTextWriter(fs, Encoding.UTF8))
+            using (var writer = XmlWriter.Create(fs, new XmlWriterSettings {Encoding = Encoding.UTF8, Indent = true}))
             {
-                writer.Formatting = Formatting.Indented;
                 doc.WriteTo(writer);
                 writer.Flush();
             }

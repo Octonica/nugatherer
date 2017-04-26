@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace Octonica.NuGatherer
 {
@@ -12,7 +11,7 @@ namespace Octonica.NuGatherer
         public ProjectInfo(string path)
         {
             Path = System.IO.Path.GetFullPath(path);
-            ReferencedFrom = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
+            ReferencedFrom = new HashSet<string>(PathHelper.Comparer);
         }
     }
 }
