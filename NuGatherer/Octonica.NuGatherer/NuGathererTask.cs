@@ -23,55 +23,47 @@ namespace Octonica.NuGatherer
 
         public override bool Execute()
         {
-#if _DEBUG
+#if DEBUG
             if (!Debugger.IsAttached)
                 Debugger.Launch();
 #endif
+
             var baseDirectory = Path.GetDirectoryName(BuildEngine.ProjectFileOfTaskNode);
             if (baseDirectory == null)
                 Log.LogWarning("Can't resolve the root directory for the project.");
 
-            var properies = PrepareProperties(baseDirectory);
-            using (var collection = new ProjectInfoCollection(properies))
+            bool isValid = true;
+            var properties = PrepareProperties(baseDirectory);
+            var nugetPackages = new Dictionary<string, List<NuGetPackageInfo>>(StringComparer.Ordinal);
+            using (var collection = new ProjectInfoCollection(properties))
             {
-                var projectPaths = new Queue<string>();
-                foreach (var projFile in RootProjects)
+                var projectsByFramework = GroupByTargetFramework(collection, baseDirectory);
+                foreach (var pair in projectsByFramework)
                 {
-                    var filePath = GetFullPath(projFile, baseDirectory);
-                    projectPaths.Enqueue(filePath);
-                }
-
-                var nugetPackages = new Dictionary<string, List<NuGetPackageInfo>>(StringComparer.OrdinalIgnoreCase);
-                while (projectPaths.Count > 0)
-                {
-                    var projectInfo = collection.LoadProjectInfo(projectPaths.Dequeue());
-                    if (nugetPackages.ContainsKey(projectInfo.Path))
-                        continue;
-
-                    var directory = Path.GetDirectoryName(projectInfo.Path);
-                    Debug.Assert(directory != null);
-
-                    var packages = GetPackagesInternal(directory);
-                    nugetPackages.Add(projectInfo.Path, packages);
-
-                    var project = collection.Load(projectInfo);
-                    var references = project.GetItems("ProjectReference");
-                    foreach (var reference in references)
+                    ProjectInfoCollection localCollection=null;
+                    try
                     {
-                        var dir = reference.Project?.DirectoryPath;
-                        if (string.IsNullOrWhiteSpace(dir))
-                            dir = directory;
+                        if (pair.Key == string.Empty)
+                        {
+                            localCollection = collection;
+                        }
+                        else
+                        {
+                            var localProperties = properties.ToDictionary(p => p.Key, p => p.Value, properties.Comparer);
+                            localProperties["TargetFramework"] = pair.Key;
+                            localCollection = new ProjectInfoCollection(localProperties);
+                        }
 
-                        var refProjPath = GetFullPath(reference.EvaluatedInclude, dir);
-
-                        var refProjInfo = collection.LoadProjectInfo(refProjPath);
-                        refProjInfo.ReferencedFrom.Add(projectInfo.Path);
-
-                        projectPaths.Enqueue(refProjPath);
+                        isValid &= Validate(localCollection, pair.Value, nugetPackages);
+                    }
+                    finally
+                    {
+                        if (!ReferenceEquals(collection, localCollection))
+                            localCollection?.Dispose();
                     }
                 }
 
-                if (!collection.ValidateNuGetPackages(nugetPackages, Log))
+                if (!isValid)
                     return false;
 
                 var consolidatedPackages = Consolidate(nugetPackages.SelectMany(p => p.Value ?? Enumerable.Empty<NuGetPackageInfo>()));
@@ -79,6 +71,72 @@ namespace Octonica.NuGatherer
             }
 
             return true;
+        }
+
+        private Dictionary<string, Queue<string>> GroupByTargetFramework(ProjectInfoCollection collection, string baseDirectory)
+        {
+            var result = new Dictionary<string, Queue<string>> {{string.Empty, new Queue<string>()}};
+            foreach (var rootProjectItem in RootProjects)
+            {
+                var filePath = GetFullPath(rootProjectItem, baseDirectory);
+                var proj = collection.GetOrLoadProject(filePath);
+
+                var targetFrameworksStr = proj.GetPropertyValue("TargetFrameworks");
+                string[] targetFrameworks;
+                if (!string.IsNullOrWhiteSpace(targetFrameworksStr))
+                {
+                    targetFrameworks = targetFrameworksStr.Split(';');
+                    targetFrameworks = targetFrameworks.Where(f => !string.IsNullOrWhiteSpace(f)).Select(f => f.Trim()).ToArray();
+                }
+                else
+                    targetFrameworks = new string[0];
+
+                foreach (var targetFramework in targetFrameworks)
+                {
+                    Queue<string> queue;
+                    if (!result.TryGetValue(targetFramework, out queue))
+                        result.Add(targetFramework, queue = new Queue<string>());
+                    queue.Enqueue(filePath);
+                }
+
+                result[string.Empty].Enqueue(filePath);
+            }
+
+            return result;
+        }
+
+        private bool Validate(ProjectInfoCollection collection, Queue<string> projectPaths, Dictionary<string, List<NuGetPackageInfo>> nugetPackages)
+        {
+            while (projectPaths.Count > 0)
+            {
+                var projectInfo = collection.GetOrLoad(projectPaths.Dequeue());
+                if (nugetPackages.ContainsKey(projectInfo.FilePath))
+                    continue;
+
+                var directory = Path.GetDirectoryName(projectInfo.FilePath);
+                Debug.Assert(directory != null);
+
+                var packages = projectInfo.GetPackages(Log);
+                nugetPackages.Add(projectInfo.FilePath, packages);
+
+                var project = projectInfo.GetOrLoadProject();
+                var references = project.GetItems("ProjectReference");
+                foreach (var reference in references)
+                {
+                    var dir = reference.Project?.DirectoryPath;
+                    if (string.IsNullOrWhiteSpace(dir))
+                        dir = directory;
+
+                    var refProjPath = GetFullPath(reference.EvaluatedInclude, dir);
+
+                    var refProjInfo = collection.GetOrLoad(refProjPath);
+                    refProjInfo.ReferencedFrom.Add(projectInfo.FilePath);
+
+                    projectPaths.Enqueue(refProjPath);
+                }
+            }
+
+            return collection.ValidateNuGetPackages(nugetPackages, Log);
         }
 
         private Dictionary<string, string> PrepareProperties(string baseDirectory)
@@ -107,45 +165,6 @@ namespace Octonica.NuGatherer
                     result[evaluatedProperty.Name] = evaluatedProperty.EvaluatedValue;
                 }
             }
-
-            return result;
-        }
-
-        public IEnumerable<INuGetPackageInfo> GetPackages(string directory)
-        {
-            return GetPackagesInternal(directory);
-        }
-
-        private List<NuGetPackageInfo> GetPackagesInternal(string directory)
-        {
-            var file = Path.Combine(directory, "packages.config");
-            if (!File.Exists(file))
-                return null;
-
-            XDocument doc;
-            using (var fs = new FileStream(file, FileMode.Open, FileAccess.Read))
-            {
-                try
-                {
-                    doc = XDocument.Load(fs);
-                }
-                catch
-                {
-                    Log.LogError("The file '{0}' is not a valid xml file.", file);
-                    return null;
-                }
-            }
-
-            var root = doc.Root;
-            if (root == null || root.Name.LocalName != "packages")
-                return null;
-
-            var result = new List<NuGetPackageInfo>();
-            foreach (var package in root.Elements(XName.Get("package", root.Name.NamespaceName)))
-                result.Add(new NuGetPackageInfo(file, package));
-
-            if (result.Count == 0)
-                return null;
 
             return result;
         }

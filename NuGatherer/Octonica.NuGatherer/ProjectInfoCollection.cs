@@ -11,31 +11,27 @@ namespace Octonica.NuGatherer
         private readonly ProjectCollection _projectCollection;
 
         private readonly Dictionary<string, ProjectInfo> _projects = new Dictionary<string, ProjectInfo>(PathHelper.Comparer);
-        private readonly Dictionary<string, Project> _loadedProject = new Dictionary<string, Project>(PathHelper.Comparer);
 
         public ProjectInfoCollection(Dictionary<string, string> properties)
         {
             _projectCollection = new ProjectCollection(properties);
         }
 
-        public ProjectInfo LoadProjectInfo(string path)
+        public ProjectInfo GetOrLoad(string path)
         {
-            var project = new ProjectInfo(path);
+            var project = new ProjectInfo(path, _projectCollection);
             ProjectInfo existingProject;
-            if (_projects.TryGetValue(project.Path, out existingProject))
+            if (_projects.TryGetValue(project.FilePath, out existingProject))
                 return existingProject;
 
-            _projects.Add(project.Path, project);
+            _projects.Add(project.FilePath, project);
             return project;
         }
 
-        public Project Load(ProjectInfo projectInfo)
+        public Project GetOrLoadProject(string path)
         {
-            Project project;
-            if (!_loadedProject.TryGetValue(projectInfo.Path, out project))
-                _loadedProject.Add(projectInfo.Path, project = _projectCollection.LoadProject(projectInfo.Path));
-
-            return project;
+            var projInfo = GetOrLoad(path);
+            return projInfo.GetOrLoadProject();
         }
 
         public void Dispose()
@@ -46,7 +42,7 @@ namespace Octonica.NuGatherer
         public bool ValidateNuGetPackages(IDictionary<string, List<NuGetPackageInfo>> nugetPackages, TaskLoggingHelper log)
         {
             var rootMap = new Dictionary<string, HashSet<string>>(_projects.Comparer);
-            foreach (var root in _projects.Values.Where(v => v.ReferencedFrom.Count == 0).Select(p => p.Path))
+            foreach (var root in _projects.Values.Where(v => v.ReferencedFrom.Count == 0).Select(p => p.FilePath))
                 rootMap.Add(root, new HashSet<string>(rootMap.Comparer));
 
             foreach (var project in _projects.Values)
@@ -54,7 +50,7 @@ namespace Octonica.NuGatherer
                 var projectRoots = new HashSet<string>(rootMap.Comparer);
                 GatherRoots(project, projectRoots);
                 foreach (var root in projectRoots)
-                    rootMap[root].Add(project.Path);
+                    rootMap[root].Add(project.FilePath);
             }
 
             var packageComparer = NuGetPackageInfoComparer.Instance;
@@ -99,8 +95,8 @@ namespace Octonica.NuGatherer
         {
             if (project.ReferencedFrom.Count == 0)
             {
-                if (!roots.Contains(project.Path))
-                    roots.Add(project.Path);
+                if (!roots.Contains(project.FilePath))
+                    roots.Add(project.FilePath);
                 return;
             }
 

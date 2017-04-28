@@ -24,6 +24,16 @@ namespace Octonica.NuGatherer
                 _allProperties.Add(attribute.Name.LocalName, new Pair(attribute.Value, sourceFile));
         }
 
+        public NuGetPackageInfo(string sourceFile, string id, string version)
+        {
+            // TODO: Target framework!
+            _allProperties = new Dictionary<string, Pair>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["id"] = new Pair(id, sourceFile),
+                ["version"] = new Pair(version, sourceFile)
+            };
+        }
+
         public void Merge(NuGetPackageInfo package, TaskLoggingHelper log)
         {
             List<string> diffs = null;

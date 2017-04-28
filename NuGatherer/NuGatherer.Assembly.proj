@@ -1,15 +1,22 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <!-- This MSBuild project file contains common defenitions for each other project -->
   <PropertyGroup>
       <Version>0.0.1</Version>
       <Product>NuGatherer</Product>
       <Company>Octonica, LLC</Company>
-      <RepositoryUrl>https://github.com/Octonica/nugatherer</RepositoryUrl>
+      <RepositoryUrl>https://github.com/Octonica/nugatherer</RepositoryUrl>      
   </PropertyGroup>
   
-  <PropertyGroup Condition = "$(TargetFramework.StartsWith('netstandard'))">
-    <DefineConstants>DOTNETCORE</DefineConstants>
+  <PropertyGroup>
+    <!-- This project file is imported before the property TargetFrameworkIdentifier is resolved -->
+    <_TargetFrameworkWithoutVersion>$(TargetFramework.TrimEnd('.0123456789'))</_TargetFrameworkWithoutVersion>
+    <DefineConstants Condition="'$(_TargetFrameworkWithoutVersion)' == 'netstandard' OR '$(_TargetFrameworkWithoutVersion)' == 'netcore'">$(DefineConstants);DOTNETCORE</DefineConstants>
+    <DefineConstants Condition="'$(_TargetFrameworkWithoutVersion)' == 'net'">$(DefineConstants);DOTNETFRAMEWORK</DefineConstants>
+  </PropertyGroup>
+  
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
   </PropertyGroup>
   
 </Project>
